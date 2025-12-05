@@ -1,0 +1,6 @@
+name: astrbot_plugin_1panel
+display_name: 1Panel 面板监控
+desc: 通过 AstrBot 管理和监控 1Panel 面板，支持系统状态、容器管理、应用管理、SSH日志、防火墙规则等
+version: v1.0.0
+author: Haitun
+repo: https://github.com/yourusername/astrbot_plugin_1panel

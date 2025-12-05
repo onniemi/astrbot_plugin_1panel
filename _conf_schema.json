@@ -1,0 +1,12 @@
+{
+  "panel_host": {
+    "type": "string",
+    "default": "http://localhost:10086",
+    "description": "1Panel 面板地址（包含端口，如 http://192.168.1.1:10086）"
+  },
+  "panel_api_key": {
+    "type": "string",
+    "default": "",
+    "description": "1Panel API 密钥（在面板设置 -> 面板 -> API 接口中获取）"
+  }
+}
