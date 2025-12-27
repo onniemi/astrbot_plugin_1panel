@@ -216,7 +216,7 @@ def format_uptime(seconds: int) -> str:
     return " ".join(parts) if parts else "刚刚启动"
 
 
-@register("astrbot_plugin_1panel", "Haitun", "1Panel 面板监控插件", "1.0.1")
+@register("astrbot_plugin_1panel", "Haitun", "1Panel 面板监控插件", "1.0.2")
 class OnePanelPlugin(Star):
     """AstrBot 1Panel 插件主类"""
     
@@ -229,14 +229,48 @@ class OnePanelPlugin(Star):
         panel_api_key = config.get("panel_api_key", "")
         verify_ssl = config.get("verify_ssl", False)
         
+        # 权限管理配置
+        self.enable_whitelist = config.get("enable_whitelist", False)
+        self.whitelist_users = config.get("whitelist_users", [])
+        
         self.panel_api = OnePanelAPI(panel_host, panel_api_key, verify_ssl)
         
         logger.info("1Panel 监控插件已加载")
         logger.info(f"  Host: {panel_host}")
+        if self.enable_whitelist:
+            logger.info(f"  权限管理: 已启用 (白名单用户: {len(self.whitelist_users)}个)")
+        else:
+            logger.info(f"  权限管理: 未启用 (所有用户可用)")
+    
+    def _check_permission(self, event: AstrMessageEvent) -> tuple[bool, str]:
+        """检查用户权限
+        
+        Returns:
+            (是否有权限, 错误消息)
+        """
+        # 如果未启用白名单，所有人都可以使用
+        if not self.enable_whitelist:
+            return True, ""
+        
+        # 获取用户ID
+        user_id = event.get_sender_id()
+        
+        # 检查是否在白名单中
+        if user_id in self.whitelist_users:
+            return True, ""
+        
+        # 权限不足
+        return False, f"❌ 权限不足\n\n您的ID: {user_id}\n此命令仅限授权用户使用"
     
     @filter.command("panel")
     async def panel_command(self, event: AstrMessageEvent):
         '''1Panel 面板监控命令，查看服务器状态和系统信息'''
+        # 检查权限
+        has_permission, error_msg = self._check_permission(event)
+        if not has_permission:
+            yield event.plain_result(error_msg)
+            return
+        
         if not self.panel_api.api_key:
             yield event.plain_result("❌ 插件未配置 API 密钥，请在插件设置中配置")
             return
@@ -255,6 +289,7 @@ class OnePanelPlugin(Star):
             "ssh": self._handle_ssh,
             "firewall": self._handle_firewall,
             "cron": self._handle_cron,
+            "whoami": self._handle_whoami,
         }
         
         handler = handlers.get(command)
@@ -266,7 +301,7 @@ class OnePanelPlugin(Star):
     
     async def _handle_help(self, event: AstrMessageEvent, parts: list):
         """显示帮助信息"""
-        help_text = """🖥️ 1Panel 面板监控插件 v1.0.1
+        help_text = """🖥️ 1Panel 面板监控插件 v1.0.2
 
 📊 系统监控:
 /panel status - 系统状态（CPU、内存、负载、磁盘）
@@ -285,7 +320,19 @@ class OnePanelPlugin(Star):
 /panel firewall - 防火墙端口规则
 
 ⏰ 定时任务:
-/panel cron - 查看定时任务"""
+/panel cron - 查看定时任务
+
+👤 权限管理:
+/panel whoami - 查看当前用户ID"""
+        
+        # 如果启用了白名单，显示权限状态
+        if self.enable_whitelist:
+            user_id = event.get_sender_id()
+            if user_id in self.whitelist_users:
+                help_text += "\n\n✅ 您已获得授权"
+            else:
+                help_text += f"\n\n⚠️ 您的ID: {user_id}\n请联系管理员添加到白名单"
+        
         yield event.plain_result(help_text)
     
     async def _handle_status(self, event: AstrMessageEvent, parts: list):
@@ -572,6 +619,26 @@ class OnePanelPlugin(Star):
             status_icon = "🟢" if job.get('status') == "Enable" else "🔴"
             result += f"{status_icon} {job.get('name', '未知')}\n"
             result += f"   类型: {job.get('type', '')} | {job.get('spec', '')}\n"
+        
+        yield event.plain_result(result)
+    
+    async def _handle_whoami(self, event: AstrMessageEvent, parts: list):
+        """处理 whoami 命令 - 查看当前用户ID和权限状态"""
+        user_id = event.get_sender_id()
+        
+        result = "👤 用户信息\n\n"
+        result += f"用户ID: {user_id}\n"
+        
+        if self.enable_whitelist:
+            if user_id in self.whitelist_users:
+                result += "权限状态: ✅ 已授权\n"
+                result += f"白名单用户数: {len(self.whitelist_users)}个"
+            else:
+                result += "权限状态: ❌ 未授权\n"
+                result += "\n💡 如需使用此插件，请联系管理员将您的ID添加到白名单"
+        else:
+            result += "权限状态: ✅ 所有用户可用\n"
+            result += "（管理员未启用白名单）"
         
         yield event.plain_result(result)
     

@@ -11,6 +11,7 @@
 - 🔐 **SSH 日志** - 查看 SSH 登录记录
 - 🔥 **防火墙** - 查看端口规则
 - ⏰ **定时任务** - 查看定时任务列表
+- 👤 **权限管理** - 白名单用户控制 🆕
 
 ## 安装
 
@@ -20,10 +21,25 @@
 
 ## 配置
 
-| 配置项 | 说明 | 示例 |
-|--------|------|------|
-| panel_host | 1Panel 面板地址 | `http://192.168.1.1:10086` |
-| panel_api_key | API 密钥 | `Le7mny7s9DJrUP1pj6bbpGsqxHg6VJBG` |
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| panel_host | string | `http://localhost:10086` | 1Panel 面板地址 |
+| panel_api_key | string | `""` | API 密钥 |
+| verify_ssl | boolean | `false` | 是否验证 SSL 证书 |
+| enable_whitelist | boolean | `false` | 是否启用白名单 🆕 |
+| whitelist_users | array | `[]` | 白名单用户ID列表 🆕 |
+
+### 配置示例
+
+```json
+{
+  "panel_host": "http://192.168.1.1:10086",
+  "panel_api_key": "Le7mny7s9DJrUP1pj6bbpGsqxHg6VJBG",
+  "verify_ssl": false,
+  "enable_whitelist": true,
+  "whitelist_users": ["123456789", "987654321"]
+}
+```
 
 ### 获取 API 密钥
 
@@ -35,6 +51,41 @@
    - 同一服务器: `127.0.0.1`
    - 允许所有 IPv4: `0.0.0.0/0`
    - 允许所有 IPv6: `::/0`
+
+### 权限管理配置 🆕
+
+**1. 查看用户ID**
+
+任何用户都可以使用此命令查看自己的ID：
+```
+/panel whoami
+```
+
+输出示例：
+```
+👤 用户信息
+
+用户ID: 123456789
+权限状态: ❌ 未授权
+
+💡 如需使用此插件，请联系管理员将您的ID添加到白名单
+```
+
+**2. 配置白名单**
+
+在插件配置中添加：
+```json
+{
+  "enable_whitelist": true,
+  "whitelist_users": ["123456789", "987654321"]
+}
+```
+
+**3. 权限说明**
+
+- `enable_whitelist: false` - 所有用户都可以使用（默认）
+- `enable_whitelist: true` - 仅白名单用户可以使用
+- 未授权用户会看到 "❌ 权限不足" 提示
 
 ## 命令
 
@@ -69,6 +120,11 @@
 ### 定时任务
 ```
 /panel cron         # 查看定时任务
+```
+
+### 权限管理 🆕
+```
+/panel whoami       # 查看当前用户ID和权限状态
 ```
 
 ### 示例输出
