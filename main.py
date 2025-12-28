@@ -311,7 +311,9 @@ class OnePanelPlugin(Star):
 
 🐳 容器管理:
 /panel docker - 查看容器列表
-/panel docker start/stop/restart <名称> - 操作容器
+/panel docker start <名称> - 启动容器
+/panel docker stop <名称> - 停止容器
+/panel docker restart <名称> - 重启容器
 
 📦 应用管理:
 /panel apps - 查看已安装应用
@@ -499,7 +501,10 @@ class OnePanelPlugin(Star):
         if total > 15:
             result += f"\n... 还有 {total - 15} 个容器"
         
-        result += "\n\n💡 操作: /panel docker start|stop|restart <名称>"
+        result += "\n\n💡 操作容器:\n"
+        result += "/panel docker start <名称>\n"
+        result += "/panel docker stop <名称>\n"
+        result += "/panel docker restart <名称>"
         yield event.plain_result(result)
     
     async def _handle_apps(self, event: AstrMessageEvent, parts: list):
