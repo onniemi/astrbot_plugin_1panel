@@ -73,12 +73,28 @@
 
 **2. 配置白名单**
 
-在插件配置中添加：
+方式一：在插件配置中添加
 ```json
 {
   "enable_whitelist": true,
   "whitelist_users": ["123456789", "987654321"]
 }
+```
+
+方式二：通过指令管理（推荐）🆕
+```
+# 先让第一个管理员用户查看自己的ID
+/panel whoami
+
+# 在配置中手动添加第一个管理员ID后，该管理员可以通过指令添加其他用户
+/panel whitelist add 123456789
+/panel whitelist add 987654321
+
+# 查看白名单
+/panel whitelist list
+
+# 移除用户
+/panel whitelist remove 123456789
 ```
 
 **3. 权限说明**
@@ -124,8 +140,13 @@
 
 ### 权限管理 🆕
 ```
-/panel whoami       # 查看当前用户ID和权限状态
+/panel whoami                    # 查看当前用户ID和权限状态
+/panel whitelist list            # 查看白名单列表
+/panel whitelist add <用户ID>    # 添加用户到白名单
+/panel whitelist remove <用户ID> # 从白名单移除用户
 ```
+
+**注意**: 白名单管理命令（add/remove）仅白名单用户可用
 
 ### 示例输出
 

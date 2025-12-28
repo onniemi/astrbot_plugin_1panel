@@ -8,7 +8,7 @@ AstrBot 1Panel 面板监控插件
 2. 查看系统信息（主机名、版本、运行时间等）
 3. 容器管理、应用管理、定时任务等
 
-版本: 1.0.1
+版本: 1.0.3
 """
 
 import asyncio
@@ -216,7 +216,7 @@ def format_uptime(seconds: int) -> str:
     return " ".join(parts) if parts else "刚刚启动"
 
 
-@register("astrbot_plugin_1panel", "Haitun", "1Panel 面板监控插件", "1.0.2")
+@register("astrbot_plugin_1panel", "Haitun", "1Panel 面板监控插件", "1.0.3")
 class OnePanelPlugin(Star):
     """AstrBot 1Panel 插件主类"""
     
@@ -290,6 +290,7 @@ class OnePanelPlugin(Star):
             "firewall": self._handle_firewall,
             "cron": self._handle_cron,
             "whoami": self._handle_whoami,
+            "whitelist": self._handle_whitelist,
         }
         
         handler = handlers.get(command)
@@ -301,7 +302,7 @@ class OnePanelPlugin(Star):
     
     async def _handle_help(self, event: AstrMessageEvent, parts: list):
         """显示帮助信息"""
-        help_text = """🖥️ 1Panel 面板监控插件 v1.0.2
+        help_text = """🖥️ 1Panel 面板监控插件 v1.0.3
 
 📊 系统监控:
 /panel status - 系统状态（CPU、内存、负载、磁盘）
@@ -323,7 +324,10 @@ class OnePanelPlugin(Star):
 /panel cron - 查看定时任务
 
 👤 权限管理:
-/panel whoami - 查看当前用户ID"""
+/panel whoami - 查看当前用户ID
+/panel whitelist list - 查看白名单列表
+/panel whitelist add <用户ID> - 添加白名单
+/panel whitelist remove <用户ID> - 移除白名单"""
         
         # 如果启用了白名单，显示权限状态
         if self.enable_whitelist:
@@ -641,6 +645,93 @@ class OnePanelPlugin(Star):
             result += "（管理员未启用白名单）"
         
         yield event.plain_result(result)
+    
+    async def _handle_whitelist(self, event: AstrMessageEvent, parts: list):
+        """处理 whitelist 命令 - 白名单管理（仅白名单用户可用）"""
+        # 白名单管理命令本身也需要权限检查
+        # 但这里我们允许所有人查看自己的状态，只有操作需要权限
+        
+        if len(parts) < 3:
+            yield event.plain_result("❌ 请指定子命令\n\n用法:\n/panel whitelist list - 查看白名单\n/panel whitelist add <用户ID> - 添加用户\n/panel whitelist remove <用户ID> - 移除用户")
+            return
+        
+        sub_cmd = parts[2].lower()
+        
+        if sub_cmd == "list":
+            # 查看白名单列表
+            if not self.enable_whitelist:
+                yield event.plain_result("ℹ️ 白名单功能未启用\n\n所有用户都可以使用此插件")
+                return
+            
+            if not self.whitelist_users:
+                yield event.plain_result("📋 白名单列表\n\n当前白名单为空")
+                return
+            
+            result = f"📋 白名单列表 (共 {len(self.whitelist_users)} 个用户)\n\n"
+            for idx, uid in enumerate(self.whitelist_users, 1):
+                result += f"{idx}. {uid}\n"
+            
+            yield event.plain_result(result)
+            return
+        
+        # add 和 remove 需要权限
+        if sub_cmd in ["add", "remove"]:
+            # 检查操作者是否有权限
+            operator_id = event.get_sender_id()
+            if self.enable_whitelist and operator_id not in self.whitelist_users:
+                yield event.plain_result(f"❌ 权限不足\n\n只有白名单用户才能管理白名单\n您的ID: {operator_id}")
+                return
+            
+            if len(parts) < 4:
+                yield event.plain_result(f"❌ 请指定用户ID\n\n用法: /panel whitelist {sub_cmd} <用户ID>")
+                return
+            
+            target_user_id = parts[3]
+            
+            if sub_cmd == "add":
+                # 添加到白名单
+                if target_user_id in self.whitelist_users:
+                    yield event.plain_result(f"ℹ️ 用户 {target_user_id} 已在白名单中")
+                    return
+                
+                self.whitelist_users.append(target_user_id)
+                self._save_whitelist()
+                
+                yield event.plain_result(f"✅ 已将用户 {target_user_id} 添加到白名单\n\n当前白名单用户数: {len(self.whitelist_users)}个")
+                return
+            
+            elif sub_cmd == "remove":
+                # 从白名单移除
+                if target_user_id not in self.whitelist_users:
+                    yield event.plain_result(f"ℹ️ 用户 {target_user_id} 不在白名单中")
+                    return
+                
+                # 防止移除自己
+                if target_user_id == operator_id:
+                    yield event.plain_result("❌ 不能移除自己")
+                    return
+                
+                self.whitelist_users.remove(target_user_id)
+                self._save_whitelist()
+                
+                yield event.plain_result(f"✅ 已将用户 {target_user_id} 从白名单移除\n\n当前白名单用户数: {len(self.whitelist_users)}个")
+                return
+        
+        yield event.plain_result(f"❌ 未知子命令: {sub_cmd}\n\n可用命令: list, add, remove")
+    
+    def _save_whitelist(self):
+        """保存白名单到配置文件"""
+        try:
+            # 更新内存中的配置
+            self.config["whitelist_users"] = self.whitelist_users
+            
+            # 保存到配置文件
+            # AstrBot 会自动处理配置持久化
+            self.context.update_config(self.config)
+            
+            logger.info(f"白名单已更新，当前用户数: {len(self.whitelist_users)}")
+        except Exception as e:
+            logger.error(f"保存白名单失败: {e}")
     
     async def terminate(self):
         """插件卸载时调用"""
