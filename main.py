@@ -395,7 +395,11 @@ class OnePanelPlugin(Star):
                 virt_data = json.loads(virt_info)
                 if boot_time := virt_data.get('bootTime', 0):
                     result += f"📅 启动时间: {datetime.fromtimestamp(boot_time).strftime('%Y-%m-%d %H:%M:%S')}\n"
-                if uptime := virt_data.get('uptime', 0):
+                    # 使用当前时间减去启动时间，计算实时运行时长
+                    current_uptime = int(time.time() - boot_time)
+                    result += f"⏱️ 运行时间: {format_uptime(current_uptime)}\n"
+                elif uptime := virt_data.get('uptime', 0):
+                    # 如果没有bootTime，使用API返回的uptime
                     result += f"⏱️ 运行时间: {format_uptime(uptime)}\n"
             except json.JSONDecodeError:
                 pass
@@ -430,7 +434,11 @@ class OnePanelPlugin(Star):
                     virt_data = json.loads(virt_info)
                     if boot_time := virt_data.get('bootTime', 0):
                         result += f"📅 启动时间: {datetime.fromtimestamp(boot_time).strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    if uptime := virt_data.get('uptime', 0):
+                        # 使用当前时间减去启动时间，计算实时运行时长
+                        current_uptime = int(time.time() - boot_time)
+                        result += f"⏱️ 运行时间: {format_uptime(current_uptime)}\n"
+                    elif uptime := virt_data.get('uptime', 0):
+                        # 如果没有bootTime，使用API返回的uptime
                         result += f"⏱️ 运行时间: {format_uptime(uptime)}\n"
                 except json.JSONDecodeError:
                     pass
