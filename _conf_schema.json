@@ -10,20 +10,17 @@
     "description": "1Panel API 密钥（在面板设置 -> 面板 -> API 接口中获取）"
   },
   "verify_ssl": {
-    "type": "boolean",
+    "type": "bool",
     "default": false,
     "description": "是否验证 SSL 证书（自签名证书请设为 false）"
   },
   "enable_whitelist": {
-    "type": "boolean",
+    "type": "bool",
     "default": false,
     "description": "是否启用白名单权限管理（启用后仅白名单用户可使用）"
   },
   "whitelist_users": {
-    "type": "array",
-    "items": {
-      "type": "string"
-    },
+    "type": "list",
     "default": [],
     "description": "白名单用户ID列表（使用 /panel whoami 查看用户ID）"
   }
