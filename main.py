@@ -189,14 +189,14 @@ class OnePanelAPI:
 
 def format_bytes(bytes_val: float) -> str:
     """格式化字节数为人类可读格式"""
-    if bytes_val < 1024:
+    if bytes_val < 1000:
         return f"{bytes_val:.2f} B"
-    elif bytes_val < 1024 ** 2:
-        return f"{bytes_val / 1024:.2f} KB"
-    elif bytes_val < 1024 ** 3:
-        return f"{bytes_val / 1024 ** 2:.2f} MB"
+    elif bytes_val < 1000 ** 2:
+        return f"{bytes_val / 1000:.2f} KB"
+    elif bytes_val < 1000 ** 3:
+        return f"{bytes_val / 1000 ** 2:.2f} MB"
     else:
-        return f"{bytes_val / 1024 ** 3:.2f} GB"
+        return f"{bytes_val / 1000 ** 3:.2f} GB"
 
 
 def format_uptime(seconds: int) -> str:
