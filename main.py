@@ -192,16 +192,34 @@ class OnePanelAPI:
         return data
 
 
-def format_bytes(bytes_val: float) -> str:
-    """格式化字节数为人类可读格式"""
-    if bytes_val < 1000:
-        return f"{bytes_val:.2f} B"
-    elif bytes_val < 1000 ** 2:
-        return f"{bytes_val / 1000:.2f} KB"
-    elif bytes_val < 1000 ** 3:
-        return f"{bytes_val / 1000 ** 2:.2f} MB"
+def format_bytes(bytes_val: float, use_binary: bool = False) -> str:
+    """格式化字节数为人类可读格式
+    
+    Args:
+        bytes_val: 字节数
+        use_binary: 是否使用二进制单位（1024进制），默认为False使用十进制单位（1000进制）
+                  内存/RAM建议使用True，存储/ROM建议使用False
+    """
+    if use_binary:
+        # 使用1024进制（二进制单位，用于内存）
+        if bytes_val < 1024:
+            return f"{bytes_val:.2f} B"
+        elif bytes_val < 1024 ** 2:
+            return f"{bytes_val / 1024:.2f} KB"
+        elif bytes_val < 1024 ** 3:
+            return f"{bytes_val / 1024 ** 2:.2f} MB"
+        else:
+            return f"{bytes_val / 1024 ** 3:.2f} GB"
     else:
-        return f"{bytes_val / 1000 ** 3:.2f} GB"
+        # 使用1000进制（十进制单位，用于存储）
+        if bytes_val < 1000:
+            return f"{bytes_val:.2f} B"
+        elif bytes_val < 1000 ** 2:
+            return f"{bytes_val / 1000:.2f} KB"
+        elif bytes_val < 1000 ** 3:
+            return f"{bytes_val / 1000 ** 2:.2f} MB"
+        else:
+            return f"{bytes_val / 1000 ** 3:.2f} GB"
 
 
 def format_uptime(seconds: int) -> str:
@@ -391,7 +409,7 @@ class OnePanelPlugin(Star):
         mem_used = status.get('memoryUsedPercent', 0)
         mem_total = status.get('memoryTotal', 0)
         mem_used_bytes = status.get('memoryUsed', 0)
-        result += f"💾 内存: {mem_used:.2f}% ({format_bytes(mem_used_bytes)} / {format_bytes(mem_total)})\n"
+        result += f"💾 内存: {mem_used:.2f}% ({format_bytes(mem_used_bytes, use_binary=True)} / {format_bytes(mem_total, use_binary=True)})\n"
         
         load = status.get('load1', 0)
         cpu_cores = status.get('cpuCores', 1)
@@ -421,7 +439,7 @@ class OnePanelPlugin(Star):
                 # 获取GPU名称
                 gpu_name = gpu.get('productName', 'Unknown')[:25]
                 
-                result += f"🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used)} / {format_bytes(mem_total)}) | 温度: {temp:.0f}°C\n"
+                result += f"🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used, use_binary=True)} / {format_bytes(mem_total, use_binary=True)}) | 温度: {temp:.0f}°C\n"
         
         for disk in status.get('diskData', []):
             path = disk.get('path', '/')
@@ -515,7 +533,7 @@ class OnePanelPlugin(Star):
             result += "📊 状态\n"
             result += f"  ⚡ 负载: {load_percent:.2f}% ({load_status})\n"
             result += f"  🔲 CPU: {status.get('cpuUsedPercent', 0):.2f}% ({cpu_cores} 核)\n"
-            result += f"  💾 内存: {status.get('memoryUsedPercent', 0):.2f}% ({format_bytes(status.get('memoryUsed', 0))} / {format_bytes(status.get('memoryTotal', 0))})\n"
+            result += f"  💾 内存: {status.get('memoryUsedPercent', 0):.2f}% ({format_bytes(status.get('memoryUsed', 0), use_binary=True)} / {format_bytes(status.get('memoryTotal', 0), use_binary=True)})\n"
             
             # 获取GPU信息
             gpu_load = await self.panel_api.get_gpu_load()
@@ -539,7 +557,7 @@ class OnePanelPlugin(Star):
                     # 获取GPU名称
                     gpu_name = gpu.get('productName', 'Unknown')[:25]
                     
-                    result += f"  🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used)} / {format_bytes(mem_total)}) | 温度: {temp:.0f}°C\n"
+                    result += f"  🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used, use_binary=True)} / {format_bytes(mem_total, use_binary=True)}) | 温度: {temp:.0f}°C\n"
             
             for disk in status.get('diskData', []):
                 result += f"  💿 磁盘 {disk.get('path', '/')}: {disk.get('usedPercent', 0):.2f}% ({format_bytes(disk.get('used', 0))} / {format_bytes(disk.get('total', 0))})\n"
