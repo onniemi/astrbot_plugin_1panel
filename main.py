@@ -358,8 +358,10 @@ class OnePanelPlugin(Star):
         result += f"💾 内存: {mem_used:.2f}% ({format_bytes(mem_used_bytes)} / {format_bytes(mem_total)})\n"
         
         load = status.get('load1', 0)
-        load_status = "运行流畅" if load < 1 else ("负载较高" if load < 2 else "负载过高")
-        result += f"⚡ 负载: {load:.2f} ({load_status})\n"
+        cpu_cores = status.get('cpuCores', 1)
+        load_percent = load * 100
+        load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
+        result += f"⚡ 负载: {load_percent:.2f}% ({load_status})\n"
         
         for disk in status.get('diskData', []):
             path = disk.get('path', '/')
@@ -447,8 +449,8 @@ class OnePanelPlugin(Star):
         if status:
             load = status.get('load1', 0)
             cpu_cores = status.get('cpuCores') or (info.get('cpuCores') if info else 0) or 1
-            load_percent = (load / cpu_cores * 100) if cpu_cores > 0 else 0
-            load_status = "运行流畅" if load < 1 else ("负载较高" if load < 2 else "负载过高")
+            load_percent = load * 100
+            load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
             
             result += "📊 状态\n"
             result += f"  ⚡ 负载: {load_percent:.2f}% ({load_status})\n"
