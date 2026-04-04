@@ -404,7 +404,9 @@ class OnePanelPlugin(Star):
             return
         
         result = "📊 系统状态\n\n"
-        result += f"🔲 CPU: {status.get('cpuUsedPercent', 0):.2f}% ({status.get('cpuCores', 0)} 核)\n"
+        cpu_cores = status.get('cpuCores', 0)
+        cpu_used = status.get('cpuUsedPercent', 0) * cpu_cores
+        result += f"🔲 CPU: {cpu_used:.2f}% ({cpu_cores} 核)\n"
         
         mem_used = status.get('memoryUsedPercent', 0)
         mem_total = status.get('memoryTotal', 0)
@@ -413,7 +415,7 @@ class OnePanelPlugin(Star):
         
         load = status.get('load1', 0)
         cpu_cores = status.get('cpuCores', 1)
-        load_percent = load * 100
+        load_percent = (load / cpu_cores) * 100
         load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
         result += f"⚡ 负载: {load_percent:.2f}% ({load_status})\n"
         
@@ -527,12 +529,13 @@ class OnePanelPlugin(Star):
         if status:
             load = status.get('load1', 0)
             cpu_cores = status.get('cpuCores') or (info.get('cpuCores') if info else 0) or 1
-            load_percent = load * 100
+            load_percent = (load / cpu_cores) * 100
             load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
+            cpu_used = status.get('cpuUsedPercent', 0) * cpu_cores
             
             result += "📊 状态\n"
             result += f"  ⚡ 负载: {load_percent:.2f}% ({load_status})\n"
-            result += f"  🔲 CPU: {status.get('cpuUsedPercent', 0):.2f}% ({cpu_cores} 核)\n"
+            result += f"  🔲 CPU: {cpu_used:.2f}% ({cpu_cores} 核)\n"
             result += f"  💾 内存: {status.get('memoryUsedPercent', 0):.2f}% ({format_bytes(status.get('memoryUsed', 0), use_binary=True)} / {format_bytes(status.get('memoryTotal', 0), use_binary=True)})\n"
             
             # 获取GPU信息
