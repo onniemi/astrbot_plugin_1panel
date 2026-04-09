@@ -185,18 +185,41 @@ class OnePanelAPI:
         return await self._request("POST", "/api/v2/hosts/firewall/search", {
             "page": page, "pageSize": page_size, "type": rule_type
         })
+    
+    async def get_gpu_load(self) -> Optional[Dict]:
+        """获取GPU负载信息（通过1Panel AI GPU API）"""
+        data = await self._request("GET", "/api/v2/ai/gpu/load")
+        return data
 
 
-def format_bytes(bytes_val: float) -> str:
-    """格式化字节数为人类可读格式"""
-    if bytes_val < 1024:
-        return f"{bytes_val:.2f} B"
-    elif bytes_val < 1024 ** 2:
-        return f"{bytes_val / 1024:.2f} KB"
-    elif bytes_val < 1024 ** 3:
-        return f"{bytes_val / 1024 ** 2:.2f} MB"
+def format_bytes(bytes_val: float, use_binary: bool = False) -> str:
+    """格式化字节数为人类可读格式
+    
+    Args:
+        bytes_val: 字节数
+        use_binary: 是否使用二进制单位（1024进制），默认为False使用十进制单位（1000进制）
+                  内存/RAM建议使用True，存储/ROM建议使用False
+    """
+    if use_binary:
+        # 使用1024进制（二进制单位，用于内存）
+        if bytes_val < 1024:
+            return f"{bytes_val:.2f} B"
+        elif bytes_val < 1024 ** 2:
+            return f"{bytes_val / 1024:.2f} KB"
+        elif bytes_val < 1024 ** 3:
+            return f"{bytes_val / 1024 ** 2:.2f} MB"
+        else:
+            return f"{bytes_val / 1024 ** 3:.2f} GB"
     else:
-        return f"{bytes_val / 1024 ** 3:.2f} GB"
+        # 使用1000进制（十进制单位，用于存储）
+        if bytes_val < 1000:
+            return f"{bytes_val:.2f} B"
+        elif bytes_val < 1000 ** 2:
+            return f"{bytes_val / 1000:.2f} KB"
+        elif bytes_val < 1000 ** 3:
+            return f"{bytes_val / 1000 ** 2:.2f} MB"
+        else:
+            return f"{bytes_val / 1000 ** 3:.2f} GB"
 
 
 def format_uptime(seconds: int) -> str:
@@ -300,6 +323,37 @@ class OnePanelPlugin(Star):
         else:
             yield event.plain_result(f"❌ 未知命令: {command}\n使用 /panel 查看帮助")
     
+    def _parse_memory_string(self, mem_str: str) -> float:
+        """解析内存字符串（如"1892 MiB"）转换为字节数"""
+        if not mem_str:
+            return 0
+        
+        mem_str = mem_str.strip().upper()
+        
+        # 提取数值和单位
+        value = 0.0
+        unit = ''
+        
+        for i, char in enumerate(mem_str):
+            if char.isdigit() or char == '.':
+                continue
+            else:
+                value = float(mem_str[:i])
+                unit = mem_str[i:].strip()
+                break
+        
+        # 转换为字节
+        if 'MIB' in unit or 'MB' in unit:
+            return value * 1024 * 1024
+        elif 'GIB' in unit or 'GB' in unit:
+            return value * 1024 * 1024 * 1024
+        elif 'KIB' in unit or 'KB' in unit:
+            return value * 1024
+        elif 'B' in unit:
+            return value
+        else:
+            return value * 1024 * 1024  # 默认为MB
+    
     async def _handle_help(self, event: AstrMessageEvent, parts: list):
         """显示帮助信息"""
         help_text = """🖥️ 1Panel 面板监控插件 v1.0.3
@@ -350,16 +404,44 @@ class OnePanelPlugin(Star):
             return
         
         result = "📊 系统状态\n\n"
-        result += f"🔲 CPU: {status.get('cpuUsedPercent', 0):.2f}% ({status.get('cpuCores', 0)} 核)\n"
+        cpu_cores = status.get('cpuCores', 0)
+        cpu_used = status.get('cpuUsedPercent', 0) * cpu_cores
+        result += f"🔲 CPU: {cpu_used:.2f}% ({cpu_cores} 核)\n"
         
         mem_used = status.get('memoryUsedPercent', 0)
         mem_total = status.get('memoryTotal', 0)
         mem_used_bytes = status.get('memoryUsed', 0)
-        result += f"💾 内存: {mem_used:.2f}% ({format_bytes(mem_used_bytes)} / {format_bytes(mem_total)})\n"
+        result += f"💾 内存: {mem_used:.2f}% ({format_bytes(mem_used_bytes, use_binary=True)} / {format_bytes(mem_total, use_binary=True)})\n"
         
         load = status.get('load1', 0)
-        load_status = "运行流畅" if load < 1 else ("负载较高" if load < 2 else "负载过高")
-        result += f"⚡ 负载: {load:.2f} ({load_status})\n"
+        cpu_cores = status.get('cpuCores', 1)
+        load_percent = (load / cpu_cores) * 100
+        load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
+        result += f"⚡ 负载: {load_percent:.2f}% ({load_status})\n"
+        
+        # 获取GPU信息
+        gpu_load = await self.panel_api.get_gpu_load()
+        if gpu_load and gpu_load.get('gpu'):
+            for gpu in gpu_load['gpu']:
+                # 解析GPU使用率（格式："15 %"）
+                gpu_util_str = gpu.get('gpuUtil', '0 %')
+                gpu_util = float(gpu_util_str.replace('%', '').strip()) if gpu_util_str else 0
+                
+                # 解析显存（格式："1892 MiB"）
+                mem_used_str = gpu.get('memUsed', '0 MiB')
+                mem_total_str = gpu.get('memTotal', '0 MiB')
+                mem_used = self._parse_memory_string(mem_used_str)
+                mem_total = self._parse_memory_string(mem_total_str)
+                mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
+                
+                # 解析温度（格式："48 C"）
+                temp_str = gpu.get('temperature', '0 C')
+                temp = float(temp_str.replace('C', '').strip()) if temp_str else 0
+                
+                # 获取GPU名称
+                gpu_name = gpu.get('productName', 'Unknown')[:25]
+                
+                result += f"🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used, use_binary=True)} / {format_bytes(mem_total, use_binary=True)}) | 温度: {temp:.0f}°C\n"
         
         for disk in status.get('diskData', []):
             path = disk.get('path', '/')
@@ -447,13 +529,38 @@ class OnePanelPlugin(Star):
         if status:
             load = status.get('load1', 0)
             cpu_cores = status.get('cpuCores') or (info.get('cpuCores') if info else 0) or 1
-            load_percent = (load / cpu_cores * 100) if cpu_cores > 0 else 0
-            load_status = "运行流畅" if load < 1 else ("负载较高" if load < 2 else "负载过高")
+            load_percent = (load / cpu_cores) * 100
+            load_status = "运行流畅" if load < cpu_cores else ("负载较高" if load < cpu_cores * 2 else "负载过高")
+            cpu_used = status.get('cpuUsedPercent', 0) * cpu_cores
             
             result += "📊 状态\n"
             result += f"  ⚡ 负载: {load_percent:.2f}% ({load_status})\n"
-            result += f"  🔲 CPU: {status.get('cpuUsedPercent', 0):.2f}% ({cpu_cores} 核)\n"
-            result += f"  💾 内存: {status.get('memoryUsedPercent', 0):.2f}% ({format_bytes(status.get('memoryUsed', 0))} / {format_bytes(status.get('memoryTotal', 0))})\n"
+            result += f"  🔲 CPU: {cpu_used:.2f}% ({cpu_cores} 核)\n"
+            result += f"  💾 内存: {status.get('memoryUsedPercent', 0):.2f}% ({format_bytes(status.get('memoryUsed', 0), use_binary=True)} / {format_bytes(status.get('memoryTotal', 0), use_binary=True)})\n"
+            
+            # 获取GPU信息
+            gpu_load = await self.panel_api.get_gpu_load()
+            if gpu_load and gpu_load.get('gpu'):
+                for gpu in gpu_load['gpu']:
+                    # 解析GPU使用率（格式："15 %"）
+                    gpu_util_str = gpu.get('gpuUtil', '0 %')
+                    gpu_util = float(gpu_util_str.replace('%', '').strip()) if gpu_util_str else 0
+                    
+                    # 解析显存（格式："1892 MiB"）
+                    mem_used_str = gpu.get('memUsed', '0 MiB')
+                    mem_total_str = gpu.get('memTotal', '0 MiB')
+                    mem_used = self._parse_memory_string(mem_used_str)
+                    mem_total = self._parse_memory_string(mem_total_str)
+                    mem_percent = (mem_used / mem_total * 100) if mem_total > 0 else 0
+                    
+                    # 解析温度（格式："48 C"）
+                    temp_str = gpu.get('temperature', '0 C')
+                    temp = float(temp_str.replace('C', '').strip()) if temp_str else 0
+                    
+                    # 获取GPU名称
+                    gpu_name = gpu.get('productName', 'Unknown')[:25]
+                    
+                    result += f"  🎮 GPU ({gpu_name}): {gpu_util:.1f}% | 显存: {mem_percent:.1f}% ({format_bytes(mem_used, use_binary=True)} / {format_bytes(mem_total, use_binary=True)}) | 温度: {temp:.0f}°C\n"
             
             for disk in status.get('diskData', []):
                 result += f"  💿 磁盘 {disk.get('path', '/')}: {disk.get('usedPercent', 0):.2f}% ({format_bytes(disk.get('used', 0))} / {format_bytes(disk.get('total', 0))})\n"
