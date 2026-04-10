@@ -1,1 +1,2 @@
+# Async HTTP client used for the 1Panel API integration.
 httpx>=0.24.0
